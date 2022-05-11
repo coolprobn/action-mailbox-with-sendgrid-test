@@ -33,5 +33,21 @@ module MailboxWithSendgrid
 
     # Don't generate system test files.
     config.generators.system_tests = nil
+
+    # monkey patching to resolve the issue of action mailbox inbound email sending empty attachment
+    config.to_prepare do
+      Rails::Conductor::ActionMailbox::InboundEmailsController.class_eval do
+        private
+
+        def new_mail
+          Mail.new(mail_params.except(:attachments).to_h).tap do |mail|
+            mail[:bcc]&.include_in_headers = true
+            mail_params[:attachments].to_a.compact_blank.each do |attachment|
+              mail.add_file(filename: attachment.original_filename, content: attachment.read)
+            end
+          end
+        end
+      end
+    end
   end
 end
